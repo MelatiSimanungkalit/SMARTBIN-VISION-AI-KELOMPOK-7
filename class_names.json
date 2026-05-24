@@ -1,0 +1,16 @@
+{
+  "classes": [
+    "Anorganik",
+    "B3",
+    "Organik"
+  ],
+  "class_indices": {
+    "Anorganik": 0,
+    "B3": 1,
+    "Organik": 2
+  },
+  "model_input_size": [
+    224,
+    224
+  ]
+}

@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartBin Vision — AI Waste Classifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0a1a0e;
+  --bg2:      #0d1f11;
+  --bg3:      #112716;
+  --surface:  #162c1b;
+  --surface2: #1a3320;
+  --border:   rgba(74,222,128,0.08);
+  --border2:  rgba(74,222,128,0.18);
+  --text:     #e8f5ec;
+  --muted:    #6b9278;
+  --muted2:   #3d6147;
+  --green:    #4ade80;
+  --green2:   #22c55e;
+  --green3:   #16a34a;
+  --lime:     #a3e635;
+  --orange:   #fb923c;
+  --radius:   16px;
+  --radius-lg:24px;
+  --font:     'Plus Jakarta Sans', sans-serif;
+  --mono:     'Space Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#bgCanvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center,
+    transparent 30%,
+    rgba(7,14,9,0.55) 70%,
+    rgba(5,10,7,0.85) 100%);
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: rgba(8,18,10,0.45);
+}
+
+.wrapper {
+  position: relative;
+  z-index: 2;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 2rem 6rem;
+}
+
+/* ═══ NAVBAR ══════════════════════════════════════════════ */
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.4rem 0;
+  border-bottom: 1px solid var(--border);
+  animation: fadeDown 0.7s ease both;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  background: var(--green);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.logo span { color: var(--green); }
+
+.nav-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.9rem;
+  background: rgba(74,222,128,0.08);
+  border: 1px solid rgba(74,222,128,0.2);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--green);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.nav-badge-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  animation: blink 2s ease infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ═══ HERO ════════════════════════════════════════════════ */
+header {
+  padding: 5rem 0 3.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  max-width: 700px;
+  animation: fadeUp 0.9s 0.1s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.hero-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  font-size: 0.73rem;
+  font-family: var(--mono);
+  color: var(--muted);
+  letter-spacing: 1px;
+  width: fit-content;
+}
+
+h1 {
+  font-size: clamp(2.8rem, 6vw, 5rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -2px;
+}
+
+.h1-main { color: var(--text); display: block; }
+.h1-accent { color: var(--green); display: block; font-style: italic; }
+
+.hero-desc {
+  font-size: 1rem;
+  color: var(--muted);
+  line-height: 1.7;
+  font-weight: 400;
+  max-width: 520px;
+}
+
+.hero-desc b { color: var(--green); font-weight: 600; }
+
+.model-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  width: fit-content;
+}
+
+.model-pill.ok {
+  background: rgba(74,222,128,0.08);
+  border: 1px solid rgba(74,222,128,0.2);
+  color: var(--green);
+}
+
+.model-pill.err {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: #f87171;
+}
+
+/* ═══ CLASS CARDS ════════════════════════════════════════ */
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 2.5rem 0;
+  animation: fadeUp 0.9s 0.25s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.class-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.2rem;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.class-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border2);
+}
+
+.class-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.7rem;
+}
+
+.class-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.class-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.class-bin {
+  font-size: 0.7rem;
+  font-family: var(--mono);
+  color: var(--muted);
+  margin-top: 0.1rem;
+}
+
+.class-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+}
+
+.ex-chip {
+  font-size: 0.68rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(74,222,128,0.06);
+  border: 1px solid rgba(74,222,128,0.12);
+  color: var(--muted);
+}
+
+/* ═══ TABS ════════════════════════════════════════════════ */
+.tabs {
+  margin: 2rem 0;
+  animation: fadeUp 0.9s 0.3s cubic-bezier(0.16,1,0.3,1) both;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 1.5rem;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 0.65rem;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 10px;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.tab-btn.active {
+  background: var(--surface2);
+  color: var(--green);
+  border: 1px solid var(--border2);
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ═══ CARD ════════════════════════════════════════════════ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.card-body { padding: 1.8rem; }
+
+/* ═══ UPLOAD ══════════════════════════════════════════════ */
+.upload-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.drop-zone {
+  border: 2px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 2.5rem 1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+
+.drop-zone:hover, .drop-zone.drag {
+  border-color: var(--green);
+  background: rgba(74,222,128,0.04);
+}
+
+.drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.drop-icon { font-size: 2.5rem; margin-bottom: 0.7rem; }
+
+.drop-label {
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+#previewImg {
+  width: 100%;
+  border-radius: 12px;
+  display: none;
+  object-fit: cover;
+  max-height: 220px;
+}
+
+.btn {
+  padding: 0.7rem 1.4rem;
+  border: none;
+  border-radius: 10px;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn:not(:disabled):hover { transform: translateY(-1px); }
+
+.btn-primary {
+  background: var(--green);
+  color: #0a1a0e;
+  width: 100%;
+}
+
+/* ═══ CAMERA ═════════════════════════════════════════════ */
+.cam-wrap {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg3);
+  aspect-ratio: 4/3;
+}
+
+#videoEl { width: 100%; height: 100%; object-fit: cover; display: block; }
+#snapCanvas { display: none; }
+
+.cam-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.cam-overlay-icon { font-size: 3rem; }
+
+.cam-controls {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.cam-controls .btn { flex: 1; }
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text);
+}
+
+.btn-danger {
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.3);
+  color: #f87171;
+}
+
+/* ═══ RESULT ══════════════════════════════════════════════ */
+.result-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1rem;
+  color: var(--muted);
+}
+
+.result-empty-icon { font-size: 2rem; opacity: 0.5; }
+.result-empty-text { font-size: 0.8rem; font-family: var(--mono); letter-spacing: 0.5px; }
+
+.result-card { display: flex; flex-direction: column; gap: 1rem; }
+
+.result-hero {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.2rem;
+  border-radius: var(--radius);
+  border: 1px solid;
+}
+
+.result-icon { font-size: 2.8rem; line-height: 1; }
+
+.result-info { flex: 1; }
+
+.result-category {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.result-bin {
+  font-size: 0.74rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+  font-family: var(--mono);
+}
+
+.result-conf { text-align: right; }
+
+.result-conf-num {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: var(--mono);
+  line-height: 1;
+}
+
+.result-conf-label {
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 0.2rem;
+}
+
+.tips-box {
+  background: rgba(74,222,128,0.04);
+  border: 1px solid rgba(74,222,128,0.1);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  font-size: 0.82rem;
+  color: #8ab896;
+  line-height: 1.6;
+}
+
+.prob-label {
+  font-size: 0.68rem;
+  font-family: var(--mono);
+  color: var(--muted2);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.prob-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.prob-lbl { font-size: 0.78rem; width: 100px; flex-shrink: 0; }
+
+.prob-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.prob-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.16,1,0.3,1);
+}
+
+.prob-pct {
+  font-size: 0.72rem;
+  font-family: var(--mono);
+  color: var(--muted);
+  width: 42px;
+  text-align: right;
+}
+
+/* ═══ SPINNER ════════════════════════════════════════════ */
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border2);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 2rem auto 0.6rem;
+}
+
+.spinner-text {
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 1px;
+  padding-bottom: 1.5rem;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ═══ SEARCH ══════════════════════════════════════════════ */
+.search-wrap { display: flex; flex-direction: column; gap: 1.2rem; }
+
+.search-box {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.search-box input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.search-box input:focus { border-color: var(--green); }
+.search-box input::placeholder { color: var(--muted2); }
+
+.btn-search {
+  background: var(--green);
+  color: #0a1a0e;
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 1.2rem;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.15s;
+}
+
+.btn-search:hover { transform: translateY(-1px); }
+
+.search-result-card {
+  padding: 1rem 1.2rem;
+  border-left: 3px solid;
+  border-radius: 0 12px 12px 0;
+  background: var(--surface2);
+}
+
+.kw-section { display: flex; flex-direction: column; gap: 0.8rem; }
+
+.kw-divider {
+  font-size: 0.68rem;
+  font-family: var(--mono);
+  color: var(--muted2);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.kw-group { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+
+.kw-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-family: var(--mono);
+  width: 100%;
+  margin-bottom: 0.2rem;
+}
+
+.chip {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.chip:hover { opacity: 0.8; transform: scale(1.04); }
+
+/* ═══ ANIMATIONS ══════════════════════════════════════════ */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══ RESPONSIVE ══════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .wrapper { padding: 0 1rem 4rem; }
+  .upload-grid { grid-template-columns: 1fr; }
+  .class-grid { grid-template-columns: 1fr; }
+  h1 { font-size: 2.5rem; letter-spacing: -1px; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="vignette"></div>
+<div class="overlay"></div>
+
+<div class="wrapper">
+
+  <!-- NAVBAR -->
+  <nav>
+    <div class="logo">
+      <div class="logo-icon">♻️</div>
+      Smart<span>Bin</span> Vision
+    </div>
+    <div class="nav-badge">
+      <span class="nav-badge-dot"></span>
+      AI · 3-Class
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header>
+    <div class="hero-tag">♻️ Kelompok 7 · Praktikum AI</div>
+    <h1>
+      <span class="h1-main">Klasifikasi</span>
+      <span class="h1-accent">Sampah Cerdas</span>
+    </h1>
+    <p class="hero-desc">
+      Upload foto atau gunakan kamera untuk mengklasifikasikan sampah ke <b>3 kategori</b>:
+      <b>Organik</b>, <b>Anorganik</b>, dan <b>B3</b> (Bahan Berbahaya & Beracun) menggunakan deep learning.
+    </p>
+    {% if model_ready %}
+    <div class="model-pill ok">✓ Model siap · smartbin_best.h5</div>
+    {% else %}
+    <div class="model-pill err">✕ Model tidak ditemukan</div>
+    {% endif %}
+  </header>
+
+  <!-- CLASS INFO CARDS -->
+  <div class="class-grid">
+    {% for name, info in class_info.items() %}
+    <div class="class-card" style="border-color: {{ info.color }}22;">
+      <div class="class-card-top">
+        <span class="class-icon">{{ info.icon }}</span>
+        <div>
+          <div class="class-name" style="color: {{ info.color }};">{{ name }}</div>
+          <div class="class-bin">🗑 {{ info.bin }}</div>
+        </div>
+      </div>
+      <div class="class-examples">
+        {% for ex in info.contoh %}
+        <span class="ex-chip">{{ ex }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('upload', this)">📤 Upload Foto</button>
+      <button class="tab-btn" onclick="switchTab('camera', this)">📷 Kamera</button>
+      <button class="tab-btn" onclick="switchTab('text', this)">🔍 Cari Teks</button>
+    </div>
+
+    <!-- TAB 1: UPLOAD -->
+    <div id="tab-upload" class="tab-panel active">
+      <div class="card">
+        <div class="card-body">
+          <div class="upload-grid">
+            <!-- Drop Zone -->
+            <div>
+              <div class="drop-zone" id="dropZone">
+                <input type="file" id="fileInput" accept="image/*" onchange="onFileChange(event)">
+                <div class="drop-icon">🖼️</div>
+                <div class="drop-label">
+                  <b style="color:var(--green)">Klik untuk pilih foto</b><br>
+                  atau drag &amp; drop di sini<br>
+                  <span style="font-size:0.72rem;opacity:0.6;">JPG, PNG, WEBP</span>
+                </div>
+              </div>
+              <img id="previewImg" src="" alt="Preview">
+            </div>
+            <!-- Preview & Analyze -->
+            <div class="preview-wrap">
+              <div id="uploadResult">
+                <div class="result-empty">
+                  <span class="result-empty-icon">📁</span>
+                  <div class="result-empty-text">pilih gambar terlebih dahulu</div>
+                </div>
+              </div>
+              <button class="btn btn-primary" id="btnAnalyze" onclick="analyzeUpload()" disabled>
+                🔍 Analisis Sampah
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: CAMERA -->
+    <div id="tab-camera" class="tab-panel">
+      <div class="card">
+        <div class="card-body">
+          <div class="upload-grid">
+            <div>
+              <div class="cam-wrap">
+                <video id="videoEl" autoplay playsinline></video>
+                <canvas id="snapCanvas"></canvas>
+                <div class="cam-overlay" id="camOverlay">
+                  <span class="cam-overlay-icon">📷</span>
+                  <span>Kamera belum aktif</span>
+                </div>
+              </div>
+              <div class="cam-controls">
+                <button class="btn btn-outline" id="btnStart" onclick="startCam()">▶ Mulai Kamera</button>
+                <button class="btn btn-primary" id="btnSnap" onclick="snapPhoto()" disabled>📸 Foto</button>
+                <button class="btn btn-danger" id="btnRetake" onclick="retake()" style="display:none">↩ Ulang</button>
+              </div>
+            </div>
+            <div class="preview-wrap">
+              <div id="cameraResult">
+                <div class="result-empty">
+                  <span class="result-empty-icon">📷</span>
+                  <div class="result-empty-text">aktifkan kamera · ambil foto</div>
+                </div>
+              </div>
+              <button class="btn btn-primary" id="btnAnalyzeCam" onclick="analyzeCamera()" disabled>
+                🔍 Analisis Foto
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: TEKS -->
+    <div id="tab-text" class="tab-panel">
+      <div class="card">
+        <div class="card-body">
+          <div class="search-wrap">
+            <div class="search-box">
+              <input type="text" id="searchInput"
+                     placeholder="Ketik nama benda... contoh: baterai, daun, botol plastik"
+                     onkeydown="if(event.key==='Enter') searchText()">
+              <button class="btn-search" onclick="searchText()">Cari →</button>
+            </div>
+            <div id="searchResult"></div>
+            <div class="kw-section">
+              <div class="kw-divider">Kata kunci yang didukung</div>
+
+              <div class="kw-group">
+                <div class="kw-label">🌿 Organik</div>
+                {% for kw in ["sisa makanan","daun","kulit buah","nasi","apel","pisang","rumput","ampas kopi"] %}
+                <span class="chip"
+                      style="color:#22c55e;border-color:#22c55e30;background:#22c55e0d;"
+                      onclick="document.getElementById('searchInput').value='{{ kw }}';searchText()">{{ kw }}</span>
+                {% endfor %}
+              </div>
+
+              <div class="kw-group">
+                <div class="kw-label">🔵 Anorganik</div>
+                {% for kw in ["plastik","botol plastik","kaleng","kertas","kardus","kaca","baju","kresek"] %}
+                <span class="chip"
+                      style="color:#3b82f6;border-color:#3b82f630;background:#3b82f60d;"
+                      onclick="document.getElementById('searchInput').value='{{ kw }}';searchText()">{{ kw }}</span>
+                {% endfor %}
+              </div>
+
+              <div class="kw-group">
+                <div class="kw-label">☢️ B3 (Berbahaya)</div>
+                {% for kw in ["baterai","baterai aa","kabel","hp","charger","laptop","lampu neon","obat","pestisida"] %}
+                <span class="chip"
+                      style="color:#ef4444;border-color:#ef444430;background:#ef44440d;"
+                      onclick="document.getElementById('searchInput').value='{{ kw }}';searchText()">{{ kw }}</span>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /tabs -->
+
+</div><!-- /wrapper -->
+
+<script>
+// ══ CANVAS BACKGROUND ═════════════════════════════════════
+(function initBg() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  const perm = new Uint8Array(512);
+  for (let i = 0; i < 256; i++) perm[i] = i;
+  for (let i = 255; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [perm[i],perm[j]]=[perm[j],perm[i]]; }
+  for (let i = 0; i < 256; i++) perm[256+i] = perm[i];
+
+  function fade(t) { return t*t*t*(t*(t*6-15)+10); }
+  function lerp(a,b,t) { return a+t*(b-a); }
+  function grad(h,x,y) { const v=h&3; return v===0?x+y:v===1?-x+y:v===2?x-y:-x-y; }
+  function noise(x,y) {
+    const xi=Math.floor(x)&255, yi=Math.floor(y)&255;
+    const xf=x-Math.floor(x), yf=y-Math.floor(y);
+    const u=fade(xf), v=fade(yf);
+    const a=perm[xi]+yi, b=perm[xi+1]+yi;
+    return lerp(lerp(grad(perm[a],xf,yf),grad(perm[b],xf-1,yf),u),lerp(grad(perm[a+1],xf,yf-1),grad(perm[b+1],xf-1,yf-1),u),v);
+  }
+
+  const LEAF_COUNT = 38;
+  const leaves = [];
+  const leafColors = ['#0d4a1a','#0f5c20','#146b26','#0a3d14','#1a6b2e','#0c4418','#184f22','#0e5520','#236b34','#0b3a12','#1d7835','#0f4d1c'];
+  for (let i = 0; i < LEAF_COUNT; i++) {
+    leaves.push({
+      x: Math.random()*1.4-0.2, y: Math.random()*1.4-0.2,
+      size: 40+Math.random()*120, angle: Math.random()*Math.PI*2,
+      rotSpeed: (Math.random()-0.5)*0.004,
+      speedX: (Math.random()-0.5)*0.00015, speedY: (Math.random()-0.5)*0.00012,
+      color: leafColors[Math.floor(Math.random()*leafColors.length)],
+      alpha: 0.15+Math.random()*0.45, noiseOff: Math.random()*100, veinAlpha: 0.1+Math.random()*0.15,
+    });
+  }
+
+  const blobs = [];
+  const blobColors = ['#0d4a1a','#0c3d14','#1a6b2e','#0a2e10','#153d1e'];
+  for (let i = 0; i < 7; i++) {
+    blobs.push({ x: Math.random(), y: Math.random(), r: 200+Math.random()*350,
+      color: blobColors[Math.floor(Math.random()*blobColors.length)],
+      speedX: (Math.random()-0.5)*0.00008, speedY: (Math.random()-0.5)*0.00006,
+      alpha: 0.18+Math.random()*0.22 });
+  }
+
+  let frame = 0;
+
+  function drawLeaf(ctx, x, y, size, angle, alpha) {
+    ctx.save(); ctx.translate(x,y); ctx.rotate(angle); ctx.globalAlpha = alpha;
+    ctx.beginPath(); ctx.moveTo(0,-size);
+    ctx.bezierCurveTo(size*0.6,-size*0.5, size*0.8,size*0.3, 0,size);
+    ctx.bezierCurveTo(-size*0.8,size*0.3, -size*0.6,-size*0.5, 0,-size);
+    ctx.closePath(); ctx.restore();
+  }
+
+  function drawVeins(ctx, x, y, size, angle, alpha) {
+    ctx.save(); ctx.translate(x,y); ctx.rotate(angle); ctx.globalAlpha = alpha*0.5;
+    ctx.strokeStyle = '#1a7a30'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(0,-size*0.85); ctx.lineTo(0,size*0.85); ctx.stroke();
+    for (let v=-3; v<=3; v++) {
+      if(v===0) continue;
+      const t=v/4, yp=t*size*0.8, xEnd=(size*0.5)*(1-Math.abs(t))*Math.sign(v);
+      ctx.beginPath(); ctx.moveTo(0,yp);
+      ctx.quadraticCurveTo(xEnd*0.5, yp-size*0.1*Math.sign(v), xEnd, yp-size*0.2*Math.sign(v));
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function render() {
+    requestAnimationFrame(render); frame++;
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle='#09150b'; ctx.fillRect(0,0,W,H);
+    blobs.forEach(b => {
+      b.x+=b.speedX; b.y+=b.speedY;
+      if(b.x<-0.3) b.x=1.2; if(b.x>1.3) b.x=-0.2;
+      if(b.y<-0.3) b.y=1.2; if(b.y>1.3) b.y=-0.2;
+      const grd=ctx.createRadialGradient(b.x*W,b.y*H,0,b.x*W,b.y*H,b.r);
+      grd.addColorStop(0,b.color+'cc'); grd.addColorStop(0.5,b.color+'44'); grd.addColorStop(1,'transparent');
+      ctx.globalAlpha=b.alpha; ctx.fillStyle=grd;
+      ctx.beginPath(); ctx.arc(b.x*W,b.y*H,b.r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1;
+    const t=frame*0.001;
+    leaves.forEach(l => {
+      const nx=noise(l.noiseOff+t*0.5,0)*0.0008, ny=noise(0,l.noiseOff+t*0.5)*0.0006;
+      l.x+=l.speedX+nx; l.y+=l.speedY+ny; l.angle+=l.rotSpeed;
+      if(l.x<-0.25) l.x=1.2; if(l.x>1.25) l.x=-0.15;
+      if(l.y<-0.25) l.y=1.2; if(l.y>1.25) l.y=-0.15;
+      const px=l.x*W, py=l.y*H;
+      ctx.save(); drawLeaf(ctx,px,py,l.size,l.angle,l.alpha); ctx.fillStyle=l.color; ctx.fill(); ctx.restore();
+      drawVeins(ctx,px,py,l.size,l.angle,l.veinAlpha);
+    });
+    if(frame%3===0) { ctx.globalAlpha=0.025; ctx.fillStyle='#000'; for(let y=0;y<H;y+=4) ctx.fillRect(0,y,W,1); }
+    ctx.globalAlpha=1;
+  }
+  render();
+})();
+
+// ══ TABS ════════════════════════════════════════════════
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ══ UPLOAD ═════════════════════════════════════════════
+let uploadDataURL = null;
+
+function onFileChange(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    uploadDataURL = ev.target.result;
+    const img = document.getElementById('previewImg');
+    img.src = uploadDataURL; img.style.display='block';
+    document.getElementById('btnAnalyze').disabled = false;
+    document.getElementById('uploadResult').innerHTML = `
+      <div class="result-empty">
+        <span class="result-empty-icon">✓</span>
+        <div class="result-empty-text">siap dianalisis</div>
+      </div>`;
+  };
+  reader.readAsDataURL(file);
+}
+
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+dz.addEventListener('drop', e=>{
+  e.preventDefault(); dz.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if(file){const dt=new DataTransfer();dt.items.add(file);document.getElementById('fileInput').files=dt.files;onFileChange({target:{files:[file]}});}
+});
+
+async function analyzeUpload() {
+  if (!uploadDataURL) return;
+  showSpinner('uploadResult');
+  const res = await callPredict(uploadDataURL);
+  renderResult('uploadResult', res);
+}
+
+// ══ CAMERA ═════════════════════════════════════════════
+let stream=null, snapDataURL=null;
+
+async function startCam() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const v = document.getElementById('videoEl');
+    v.srcObject = stream;
+    document.getElementById('camOverlay').style.display='none';
+    document.getElementById('btnStart').disabled=true;
+    document.getElementById('btnSnap').disabled=false;
+  } catch(err){ alert('Kamera tidak bisa diakses: '+err.message); }
+}
+
+function snapPhoto() {
+  const v=document.getElementById('videoEl'), c=document.getElementById('snapCanvas');
+  c.width=v.videoWidth; c.height=v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  snapDataURL = c.toDataURL('image/jpeg',0.9);
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  v.srcObject=null; v.style.display='none';
+  c.style.display='block'; c.style.width='100%'; c.style.borderRadius='12px';
+  document.getElementById('btnSnap').disabled=true;
+  document.getElementById('btnRetake').style.display='';
+  document.getElementById('btnAnalyzeCam').disabled=false;
+}
+
+function retake() {
+  snapDataURL=null;
+  const v=document.getElementById('videoEl'), c=document.getElementById('snapCanvas');
+  c.style.display='none'; v.style.display='block';
+  document.getElementById('camOverlay').style.display='flex';
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnSnap').disabled=true;
+  document.getElementById('btnRetake').style.display='none';
+  document.getElementById('btnAnalyzeCam').disabled=true;
+  document.getElementById('cameraResult').innerHTML=`<div class="result-empty"><span class="result-empty-icon">📷</span><div class="result-empty-text">aktifkan kamera · ambil foto</div></div>`;
+}
+
+async function analyzeCamera() {
+  if(!snapDataURL) return;
+  showSpinner('cameraResult');
+  const res = await callPredict(snapDataURL);
+  renderResult('cameraResult', res);
+}
+
+// ══ API ════════════════════════════════════════════════
+async function callPredict(dataURL) {
+  const r = await fetch('/predict',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:dataURL})});
+  return await r.json();
+}
+
+async function searchText() {
+  const q = document.getElementById('searchInput').value.trim(); if(!q) return;
+  const r = await fetch('/search',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:q})});
+  const data = await r.json();
+  const el = document.getElementById('searchResult');
+  if(data.found){
+    const exHtml = data.contoh && data.contoh.length
+      ? `<div style="margin-top:0.6rem;display:flex;flex-wrap:wrap;gap:0.3rem;">${data.contoh.map(e=>`<span style="font-size:0.68rem;padding:0.2rem 0.5rem;border-radius:999px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--muted);">${e}</span>`).join('')}</div>` : '';
+    el.innerHTML=`<div class="search-result-card" style="border-left-color:${data.color};">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.8rem;">
+        <span style="font-size:2.5rem;">${data.icon}</span>
+        <div>
+          <div style="font-size:1.4rem;font-weight:800;color:${data.color};letter-spacing:-0.5px;">${data.display}</div>
+          <div style="font-size:0.74rem;color:var(--muted);margin-top:0.2rem;font-family:var(--mono);">🗑 Tempat sampah: <b style="color:#9ed6aa;">${data.bin}</b></div>
+        </div>
+      </div>
+      <div style="background:rgba(74,222,128,0.04);border:1px solid rgba(74,222,128,0.1);border-radius:10px;padding:0.7rem 1rem;font-size:0.82rem;color:#8ab896;">💡 ${data.tips}</div>
+      ${exHtml}
+    </div>`;
+  } else {
+    el.innerHTML=`<div style="background:rgba(251,146,60,0.07);border:1px solid rgba(251,146,60,0.2);border-radius:12px;padding:0.9rem 1.2rem;color:#fb923c;font-size:0.83rem;font-family:var(--mono);">❓ "<b>${q}</b>" tidak dikenali — coba kata lain atau klik chip di bawah</div>`;
+  }
+}
+
+// ══ RENDER ════════════════════════════════════════════
+function showSpinner(id) {
+  document.getElementById(id).innerHTML=`<div><div class="spinner"></div><div class="spinner-text">menganalisis...</div></div>`;
+}
+
+function renderResult(targetId, data) {
+  if(data.error){
+    document.getElementById(targetId).innerHTML=`<div style="color:#f87171;text-align:center;font-family:var(--mono);font-size:0.85rem;padding:2rem;">✕ ${data.error}</div>`;
+    return;
+  }
+  const top=data.results[0], color=top.color;
+  let bars='';
+  data.results.forEach(r=>{
+    bars+=`<div class="prob-row">
+      <div class="prob-lbl">${r.icon} ${r.display}</div>
+      <div class="prob-track"><div class="prob-fill" style="width:${r.pct}%;background:${r.color};"></div></div>
+      <div class="prob-pct">${r.pct}%</div>
+    </div>`;
+  });
+  document.getElementById(targetId).innerHTML=`<div class="result-card">
+    <div class="result-hero" style="background:${color}0f;border-color:${color}30;color:${color};">
+      <span class="result-icon">${top.icon}</span>
+      <div class="result-info">
+        <div class="result-category" style="color:${color};">${top.display}</div>
+        <div class="result-bin">🗑 ${top.bin}</div>
+      </div>
+      <div class="result-conf">
+        <div class="result-conf-num" style="color:${color};">${top.pct}%</div>
+        <div class="result-conf-label">confidence</div>
+      </div>
+    </div>
+    <div class="tips-box">💡 <b>Tips:</b> ${top.tips}</div>
+    <div class="prob-label">semua probabilitas</div>
+    ${bars}
+  </div>`;
+}
+</script>
+</body>
+</html>
